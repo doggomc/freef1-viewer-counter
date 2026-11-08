@@ -11,7 +11,7 @@ A standalone Cloudflare Worker + hibernatable Durable Object for an approximate 
 - The count is an approximate number of open site connections, not unique people or confirmed video viewers. Browser closure, network loss, and reconnect timing can make it briefly stale. The public endpoint is not an anti-abuse or authentication system.
 - Cloudflare necessarily terminates the network connection and may process standard network metadata (such as IP address and security/request metadata) under its own service policies. This Worker does not store that metadata. The site's privacy copy should be updated when the browser connection is enabled.
 
-The only allowed browser Origin is currently `https://freef1.netlify.app`. No preview or local-development Origin is allowed in the deployed configuration. If local testing is needed, use a temporary `.dev.vars` file and never deploy that override.
+The allowed browser Origins in the deployed configuration are `https://freef1.netlify.app`, `https://freef1-live.vercel.app`, `https://freef1.site`, `https://www.freef1.site`, and `https://freef2.netlify.app`. No preview or local-development Origin is allowed in the deployed configuration. If local testing is needed, use a temporary `.dev.vars` file and never deploy that override.
 
 ## Check locally
 

@@ -1,9 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { countOpenSockets, makeCountMessage } from '../src/protocol.js';
-import { isAllowedOrigin, routeRequest } from '../src/router.js';
+import { DEFAULT_ALLOWED_ORIGINS, isAllowedOrigin, routeRequest } from '../src/router.js';
 
 const PRODUCTION_ORIGIN = 'https://freef1.netlify.app';
+const VERCEL_ORIGIN = 'https://freef1-live.vercel.app';
 
 function mockEnv() {
   const calls = { idName: null, request: null };
@@ -49,6 +51,20 @@ test('comma-separated local and production origins are parsed exactly', () => {
   const configured = `${PRODUCTION_ORIGIN}, http://localhost:8787`;
   assert.equal(isAllowedOrigin('http://localhost:8787', configured), true);
   assert.equal(isAllowedOrigin('http://localhost:8788', configured), false);
+});
+
+test('wrangler.jsonc and default origins allow both Netlify and Vercel production sites', () => {
+  const wrangler = JSON.parse(readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8'));
+  const configured = wrangler.vars?.ALLOWED_ORIGINS;
+  assert.equal(isAllowedOrigin(PRODUCTION_ORIGIN, configured), true);
+  assert.equal(isAllowedOrigin(VERCEL_ORIGIN, configured), true);
+  assert.equal(isAllowedOrigin('https://freef1.site', configured), true);
+  assert.equal(isAllowedOrigin('https://freef2.netlify.app', configured), true);
+  assert.equal(isAllowedOrigin('https://freef1-live-git-main-team.vercel.app', configured), false);
+  assert.equal(isAllowedOrigin('https://attacker.example', configured), false);
+  assert.equal(DEFAULT_ALLOWED_ORIGINS.includes(PRODUCTION_ORIGIN), true);
+  assert.equal(DEFAULT_ALLOWED_ORIGINS.includes(VERCEL_ORIGIN), true);
+  assert.equal(isAllowedOrigin(VERCEL_ORIGIN, undefined), true);
 });
 
 test('health endpoint is public, cache-disabled, and does not touch the room', async () => {

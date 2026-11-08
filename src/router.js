@@ -1,4 +1,10 @@
-const DEFAULT_ALLOWED_ORIGINS = ['https://freef1.netlify.app'];
+export const DEFAULT_ALLOWED_ORIGINS = [
+  'https://freef1.netlify.app',
+  'https://freef1-live.vercel.app',
+  'https://freef1.site',
+  'https://www.freef1.site',
+  'https://freef2.netlify.app',
+];
 const ROOM_NAME = 'freef1-global';
 
 export function parseAllowedOrigins(rawOrigins) {
