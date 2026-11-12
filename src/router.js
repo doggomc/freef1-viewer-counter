@@ -1,11 +1,14 @@
 export const DEFAULT_ALLOWED_ORIGINS = [
   'https://freef1.netlify.app',
   'https://freef1-live.vercel.app',
+  'https://freef1-backup.vercel.app',
   'https://freef1.site',
   'https://www.freef1.site',
   'https://freef2.netlify.app',
 ];
-const ROOM_NAME = 'freef1-global';
+const MAIN_ROOM = 'freef1-global';
+const BACKUP_ROOM = 'freef1-backup';
+const BACKUP_ORIGIN = 'https://freef1-backup.vercel.app';
 
 export function parseAllowedOrigins(rawOrigins) {
   const configured = typeof rawOrigins === 'string'
@@ -68,7 +71,7 @@ export async function routeRequest(request, env) {
     return textResponse('WebSocket upgrade required', 426, { Upgrade: 'websocket' });
   }
 
-  const roomId = env.VIEWER_COUNTER_ROOM.idFromName(ROOM_NAME);
+  const roomId = env.VIEWER_COUNTER_ROOM.idFromName(origin === BACKUP_ORIGIN ? BACKUP_ROOM : MAIN_ROOM);
   const room = env.VIEWER_COUNTER_ROOM.get(roomId);
   return room.fetch(request);
 }

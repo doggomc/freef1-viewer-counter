@@ -6,6 +6,7 @@ import { DEFAULT_ALLOWED_ORIGINS, isAllowedOrigin, routeRequest } from '../src/r
 
 const PRODUCTION_ORIGIN = 'https://freef1.netlify.app';
 const VERCEL_ORIGIN = 'https://freef1-live.vercel.app';
+const BACKUP_ORIGIN = 'https://freef1-backup.vercel.app';
 
 function mockEnv() {
   const calls = { idName: null, request: null };
@@ -19,7 +20,7 @@ function mockEnv() {
         return { name };
       },
       get(id) {
-        assert.equal(id.name, 'freef1-global');
+        assert.ok(['freef1-global', 'freef1-backup'].includes(id.name));
         return {
           fetch(request) {
             calls.request = request;
@@ -58,6 +59,8 @@ test('wrangler.jsonc and default origins allow both Netlify and Vercel productio
   const configured = wrangler.vars?.ALLOWED_ORIGINS;
   assert.equal(isAllowedOrigin(PRODUCTION_ORIGIN, configured), true);
   assert.equal(isAllowedOrigin(VERCEL_ORIGIN, configured), true);
+  assert.equal(isAllowedOrigin(BACKUP_ORIGIN, configured), true);
+  assert.equal(isAllowedOrigin('https://sub.freef1-backup.vercel.app', configured), false);
   assert.equal(isAllowedOrigin('https://freef1.site', configured), true);
   assert.equal(isAllowedOrigin('https://freef2.netlify.app', configured), true);
   assert.equal(isAllowedOrigin('https://freef1-live-git-main-team.vercel.app', configured), false);
@@ -114,6 +117,15 @@ test('approved WebSocket upgrade is forwarded to one fixed global room', async (
   assert.equal(response, expectedResponse);
   assert.equal(calls.idName, 'freef1-global');
   assert.equal(calls.request, incoming);
+});
+
+test('main and backup origins use separate fixed rooms with no client-selected room', async () => {
+  for (const [origin, expected] of [[VERCEL_ORIGIN, 'freef1-global'], [BACKUP_ORIGIN, 'freef1-backup']]) {
+    const { env, calls } = mockEnv();
+    env.ALLOWED_ORIGINS = `${VERCEL_ORIGIN},${BACKUP_ORIGIN}`;
+    await routeRequest(request('https://counter.example/ws', { headers: { Origin: origin, Upgrade: 'websocket' } }), env);
+    assert.equal(calls.idName, expected);
+  }
 });
 
 test('only open sockets contribute to the live count', () => {

@@ -1,6 +1,6 @@
 # FreeF1 live viewer counter
 
-A standalone Cloudflare Worker + hibernatable Durable Object for an approximate live count of open FreeF1 site connections. It is deliberately separate from the Netlify site and the Render backend. It does not write to either backend.
+A standalone Cloudflare Worker + hibernatable Durable Object for approximate live counts of open FreeF1 site connections, with separate rooms for the main and backup sites. It is deliberately separate from the Netlify site and the Render backend. It does not write to either backend.
 
 ## Privacy and data flow
 
@@ -11,7 +11,7 @@ A standalone Cloudflare Worker + hibernatable Durable Object for an approximate 
 - The count is an approximate number of open site connections, not unique people or confirmed video viewers. Browser closure, network loss, and reconnect timing can make it briefly stale. The public endpoint is not an anti-abuse or authentication system.
 - Cloudflare necessarily terminates the network connection and may process standard network metadata (such as IP address and security/request metadata) under its own service policies. This Worker does not store that metadata. The site's privacy copy should be updated when the browser connection is enabled.
 
-The allowed browser Origins in the deployed configuration are `https://freef1.netlify.app`, `https://freef1-live.vercel.app`, `https://freef1.site`, `https://www.freef1.site`, and `https://freef2.netlify.app`. No preview or local-development Origin is allowed in the deployed configuration. If local testing is needed, use a temporary `.dev.vars` file and never deploy that override.
+The allowed browser Origins in the deployed configuration are `https://freef1.netlify.app`, `https://freef1-live.vercel.app`, `https://freef1-backup.vercel.app`, `https://freef1.site`, `https://www.freef1.site`, and `https://freef2.netlify.app`. No preview or local-development Origin is allowed in the deployed configuration. If local testing is needed, use a temporary `.dev.vars` file and never deploy that override.
 
 ## Check locally
 
@@ -23,7 +23,7 @@ npm test
 npm run check
 ```
 
-The automated tests cover strict Origin checks, the fixed global room, the health route, query-string rejection, and the count message shape. They do not replace a deployed WebSocket load test.
+The automated tests cover strict Origin checks, the fixed main and backup rooms, the health route, query-string rejection, and the count message shape. They do not replace a deployed WebSocket load test.
 
 For local Wrangler testing only, create `.dev.vars` with:
 
@@ -57,7 +57,7 @@ Then run `npm run dev`. Delete `.dev.vars` before deployment. It is ignored by G
 
 The object is configured as SQLite-backed and uses hibernatable WebSockets. Cloudflare documents a 100,000 Durable Object requests/day and 13,000 GB-seconds/day Free-plan allowance; limits are hard caps, and exceeding a Free-plan limit can make further operations fail until reset. Outgoing WebSocket messages and incoming protocol-level pings are not billed as Durable Object requests; the site sends no application-level messages. Check Cloudflare's current pricing and account limits before relying on it in production: <https://developers.cloudflare.com/durable-objects/platform/pricing/>
 
-The expected race-weekend profile is approximately 200 concurrent viewers during each of FP1, FP2, and FP3; 400 during qualifying; and a peak of 800 during the race. The single global room is sized for that 800-connection peak, well below Cloudflare's documented per-object WebSocket connection limit. The website counter itself will report open site-page connections, not verified stream viewers or unique people. Connection churn and concurrent load have not been measured against your account. This implementation does not impose a monthly-hours counter or promise uninterrupted free service.
+The expected race-weekend profile is approximately 200 concurrent viewers during each of FP1, FP2, and FP3; 400 during qualifying; and a peak of 800 during the race. Each site has its own room; the original main room is sized for that 800-connection peak, well below Cloudflare's documented per-object WebSocket connection limit. The website counter itself will report open site-page connections, not verified stream viewers or unique people. Connection churn and concurrent load have not been measured against your account. This implementation does not impose a monthly-hours counter or promise uninterrupted free service.
 
 ## Implementation references
 
