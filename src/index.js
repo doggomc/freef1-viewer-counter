@@ -17,7 +17,9 @@ export class ViewerCounterRoom extends DurableObject {
     // Hibernatable acceptance keeps idle sockets connected without pinning the
     // Durable Object in memory. No socket attachments or storage are used.
     this.ctx.acceptWebSocket(server);
-    this.broadcastCount();
+    // Populate the new connection immediately; batch the room-wide update.
+    try { server.send(makeCountMessage(countOpenSockets(this.ctx.getWebSockets()))); } catch {}
+    await this.scheduleBroadcast();
 
     return new Response(null, {
       status: 101,
@@ -33,7 +35,18 @@ export class ViewerCounterRoom extends DurableObject {
     }
   }
 
-  webSocketClose() {
+  async webSocketClose() {
+    await this.scheduleBroadcast();
+  }
+
+  // Durable Object alarms survive hibernation and guarantee a trailing update.
+  async scheduleBroadcast() {
+    if (await this.ctx.storage.getAlarm() === null) {
+      await this.ctx.storage.setAlarm(Date.now() + 2500);
+    }
+  }
+
+  async alarm() {
     this.broadcastCount();
   }
 

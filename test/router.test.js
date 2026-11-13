@@ -144,3 +144,16 @@ test('count payload contains only a type and a non-negative integer', () => {
   assert.throws(() => makeCountMessage(-1), TypeError);
   assert.throws(() => makeCountMessage(1.5), TypeError);
 });
+
+test('health supports HEAD and cross-origin access but rejects other methods', async () => {
+  const { env } = mockEnv();
+  for (const method of ['GET', 'HEAD']) {
+    const response = await routeRequest(request('https://counter.example/health', { method }), env);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('access-control-allow-origin'), '*');
+    if (method === 'HEAD') assert.equal(await response.text(), '');
+  }
+  const response = await routeRequest(request('https://counter.example/health', { method: 'POST' }), env);
+  assert.equal(response.status, 405);
+  assert.equal(response.headers.get('allow'), 'GET, HEAD');
+});

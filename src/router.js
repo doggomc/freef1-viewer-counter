@@ -37,14 +37,15 @@ export async function routeRequest(request, env) {
   const url = new URL(request.url);
 
   if (url.pathname === '/health') {
-    if (request.method !== 'GET') {
-      return textResponse('Method not allowed', 405, { Allow: 'GET' });
+    if (request.method !== 'GET' && request.method !== 'HEAD') {
+      return textResponse('Method not allowed', 405, { Allow: 'GET, HEAD' });
     }
 
-    return new Response(JSON.stringify({ ok: true, service: 'freef1-viewer-counter' }), {
+    return new Response(request.method === 'HEAD' ? null : JSON.stringify({ ok: true, service: 'freef1-viewer-counter' }), {
       status: 200,
       headers: {
         'Cache-Control': 'no-store',
+        'Access-Control-Allow-Origin': '*',
         'Content-Type': 'application/json; charset=utf-8',
       },
     });
