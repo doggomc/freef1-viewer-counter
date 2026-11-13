@@ -1,12 +1,12 @@
 import { DurableObject } from 'cloudflare:workers';
 import { countOpenSockets, makeCountMessage } from './protocol.js';
 import { routeRequest } from './router.js';
-import { parseContext, contextCount, savePeak } from './peaks.js';
+import { parseContext, contextCount, savePeak, attachment, openSummary, PAGE_LABELS } from './peaks.js';
 
 export class ViewerCounterRoom extends DurableObject {
   async fetch(request) {
     if (new URL(request.url).pathname === '/internal/peaks') {
-      return Response.json({ peaks: await this.ctx.storage.get('peaks-v1') || [] }, { headers: { 'Cache-Control': 'no-store' } });
+      return Response.json({ peaks: await this.ctx.storage.get('peaks-v1') || [], current: openSummary(this.ctx.getWebSockets()) }, { headers: { 'Cache-Control': 'no-store' } });
     }
     if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') {
       return new Response('WebSocket upgrade required', {
@@ -23,7 +23,7 @@ export class ViewerCounterRoom extends DurableObject {
     this.ctx.acceptWebSocket(server);
     try { await savePeak(this.ctx.storage, 'site', 'overall', 'All open pages', countOpenSockets(this.ctx.getWebSockets())); } catch { /* counting must not interrupt viewer connections */ }
     // Populate the new connection immediately; batch the room-wide update.
-    try { server.send(makeCountMessage(countOpenSockets(this.ctx.getWebSockets()))); server.send('{"type":"capabilities","contexts":true}'); } catch {}
+    try { server.send(makeCountMessage(countOpenSockets(this.ctx.getWebSockets()))); server.send('{"type":"capabilities","contexts":true,"pages":true}'); } catch {}
     await this.scheduleBroadcast();
 
     return new Response(null, {
@@ -33,11 +33,21 @@ export class ViewerCounterRoom extends DurableObject {
   }
 
   async webSocketMessage(socket, message) {
-    if (message === '{"type":"clear"}') { socket.serializeAttachment(null); return; }
+    if (typeof message !== 'string' || message.length > 400) return;
+    let data; try { data = JSON.parse(message); } catch { return; }
+    const state = attachment(socket);
+    if (data.type === 'page') {
+      if (typeof data.page !== 'string' || !Object.hasOwn(PAGE_LABELS, data.page)) return;
+      state.page = data.page;
+      socket.serializeAttachment(state);
+      try { await savePeak(this.ctx.storage, 'page', state.page, PAGE_LABELS[state.page], openSummary(this.ctx.getWebSockets()).pages[state.page] || 0); } catch {}
+      return;
+    }
+    if (data.type === 'clear') { state.context = null; socket.serializeAttachment(state); return; }
     const context = parseContext(message);
-    if (!context) return; // Ignore unsupported metadata; never disrupt the live count.
-    socket.serializeAttachment(context);
-    try { await savePeak(this.ctx.storage, context.kind, context.key, context.label, contextCount(this.ctx.getWebSockets(), context)); } catch { /* leave the connection open if storage is unavailable */ }
+    if (!context) return;
+    state.context = context; socket.serializeAttachment(state);
+    try { await savePeak(this.ctx.storage, context.kind, context.key, context.label, contextCount(this.ctx.getWebSockets(), context)); } catch {}
   }
 
   async webSocketClose() {

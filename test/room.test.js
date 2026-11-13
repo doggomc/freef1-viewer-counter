@@ -45,6 +45,22 @@ test('context messages track matching open pages and clear without changing glob
     await room.webSocketMessage(sockets[0],msg); await room.webSocketMessage(sockets[1],msg);
     assert.equal(map.get('peaks-v1')[0].peak,2);
     await room.webSocketMessage(sockets[0],'{"type":"clear"}');
-    assert.equal(sockets[0].deserializeAttachment(),null); assert.equal(sockets[0].readyState,1);
+    assert.equal(sockets[0].deserializeAttachment().context,null); assert.equal(sockets[0].readyState,1);
   } finally { globalThis.WebSocket = old; }
+});
+
+test('page counts and peaks preserve session context and exclude closed sockets', async () => {
+  const sock = () => ({readyState:1, value:null, serializeAttachment(v){this.value=v}, deserializeAttachment(){return this.value}});
+  const sockets = [sock(), sock()]; const map = new Map();
+  const storage = {get:async k=>structuredClone(map.get(k)),put:async(k,v)=>map.set(k,structuredClone(v)),transaction:async fn=>fn(storage)};
+  const room = new ViewerCounterRoom({getWebSockets:()=>sockets,storage}, {});
+  await room.webSocketMessage(sockets[0], JSON.stringify({type:'page',page:'cockpit'}));
+  await room.webSocketMessage(sockets[1], JSON.stringify({type:'page',page:'cockpit'}));
+  await room.webSocketMessage(sockets[0], JSON.stringify({type:'context',kind:'live',key:'race',label:'Race'}));
+  assert.equal(map.get('peaks-v1').find(x=>x.kind==='page').peak, 2);
+  sockets[1].readyState = 3;
+  const response = await room.fetch({url:'https://counter.internal/internal/peaks'});
+  const data = await response.json();
+  assert.deepEqual(data.current, {total:1,unclassified:0,pages:{cockpit:1}});
+  assert.equal(sockets[0].value.context.kind, 'live');
 });

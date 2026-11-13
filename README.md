@@ -5,7 +5,7 @@ A standalone Cloudflare Worker + hibernatable Durable Object for approximate liv
 ## Privacy and data flow
 
 - A site page opens one secure WebSocket connection. The Durable Object counts its currently open sockets and pushes only `{ "type": "count", "count": N }` when a connection joins or leaves.
-- The browser sends a bounded session or stream context over its existing WebSocket on supported cockpit pages and on selection changes. There is no heartbeat, polling, visitor ID, page path, page history, or verified player activity.
+- The browser sends a bounded page category over its existing WebSocket and a session or stream context on supported cockpit pages and selection changes. There is no heartbeat, polling, visitor ID, page path, page history, or verified player activity.
 - The Worker stores aggregate peak open-page counts (up to 500 entries per site), with session or stream labels and the time each peak was reached. It does not persist individual connection records. Socket attachments preserve current categories while the object hibernates.
 - Idle sockets use Cloudflare's WebSocket Hibernation API so the Durable Object can hibernate between events.
 - The count is an approximate number of open site connections, not unique people or confirmed video viewers. Browser closure, network loss, and reconnect timing can make it briefly stale. The public endpoint is not an anti-abuse or authentication system.
@@ -67,4 +67,4 @@ The expected race-weekend profile is approximately 200 concurrent viewers during
 
 ## Peak dashboard
 
-No secret or configuration is required. Aggregate peaks are publicly readable at `/admin/peaks?site=main` and `/admin/peaks?site=backup`. The Race Control dashboard requires its usual login and fetches the two rooms only when an admin presses Load peaks. Counts are approximate open connections, not people or playback. Main and backup histories remain separate; there are no individual connection records.
+No secret or configuration is required. Aggregate current page counts and peaks are publicly readable at `/admin/peaks?site=main` and `/admin/peaks?site=backup`. The Race Control dashboard requires its usual login and fetches both rooms only when an admin requests a snapshot. Counts are approximate open connections, not people or playback. Main and backup histories remain separate; there are no individual connection records.
