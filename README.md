@@ -5,8 +5,8 @@ A standalone Cloudflare Worker + hibernatable Durable Object for approximate liv
 ## Privacy and data flow
 
 - A site page opens one secure WebSocket connection. The Durable Object counts its currently open sockets and pushes only `{ "type": "count", "count": N }` when a connection joins or leaves.
-- The browser sends no application messages: no heartbeat, polling, visitor ID, page path, page history, or player activity.
-- The Worker keeps no connection IDs and writes no visitor data to Durable Object storage. The SQLite migration is required by the Workers Free plan; this application does not create tables or persist counts.
+- The browser sends a bounded session or stream context over its existing WebSocket on supported cockpit pages and on selection changes. There is no heartbeat, polling, visitor ID, page path, page history, or verified player activity.
+- The Worker stores aggregate peak open-page counts (up to 500 entries per site), with session or stream labels and the time each peak was reached. It does not persist individual connection records. Socket attachments preserve current categories while the object hibernates.
 - Idle sockets use Cloudflare's WebSocket Hibernation API so the Durable Object can hibernate between events.
 - The count is an approximate number of open site connections, not unique people or confirmed video viewers. Browser closure, network loss, and reconnect timing can make it briefly stale. The public endpoint is not an anti-abuse or authentication system.
 - Cloudflare necessarily terminates the network connection and may process standard network metadata (such as IP address and security/request metadata) under its own service policies. This Worker does not store that metadata. The site's privacy copy should be updated when the browser connection is enabled.
@@ -55,7 +55,7 @@ Then run `npm run dev`. Delete `.dev.vars` before deployment. It is ignored by G
 
 ## Free-tier / capacity note
 
-The object is configured as SQLite-backed and uses hibernatable WebSockets. Cloudflare documents a 100,000 Durable Object requests/day and 13,000 GB-seconds/day Free-plan allowance; limits are hard caps, and exceeding a Free-plan limit can make further operations fail until reset. Outgoing WebSocket messages and incoming protocol-level pings are not billed as Durable Object requests; the site sends no application-level messages. Check Cloudflare's current pricing and account limits before relying on it in production: <https://developers.cloudflare.com/durable-objects/platform/pricing/>
+The object is configured as SQLite-backed and uses hibernatable WebSockets. Cloudflare documents a 100,000 Durable Object requests/day and 13,000 GB-seconds/day Free-plan allowance; limits are hard caps, and exceeding a Free-plan limit can make further operations fail until reset. Outgoing WebSocket messages and incoming protocol-level pings are not billed as Durable Object requests; session context messages wake the object and may count towards usage; peak increases cause storage writes. Check Cloudflare's current pricing and account limits before relying on it in production: <https://developers.cloudflare.com/durable-objects/platform/pricing/>
 
 The expected race-weekend profile is approximately 200 concurrent viewers during each of FP1, FP2, and FP3; 400 during qualifying; and a peak of 800 during the race. Each site has its own room; the original main room is sized for that 800-connection peak, well below Cloudflare's documented per-object WebSocket connection limit. The website counter itself will report open site-page connections, not verified stream viewers or unique people. Connection churn and concurrent load have not been measured against your account. This implementation does not impose a monthly-hours counter or promise uninterrupted free service.
 
@@ -64,3 +64,7 @@ The expected race-weekend profile is approximately 200 concurrent viewers during
 - WebSocket Hibernation API: <https://developers.cloudflare.com/durable-objects/best-practices/websockets/>
 - Durable Object state and WebSocket connections: <https://developers.cloudflare.com/durable-objects/api/state/>
 - SQLite Durable Object migration example: <https://developers.cloudflare.com/durable-objects/examples/websocket-hibernation-server/>
+
+## Private peak dashboard setup
+
+Set the same independently generated random `PEAKS_READ_SECRET` (at least 32 characters) as an encrypted secret on this Worker and as an environment variable on headquarters and each backend. Do not commit it or put it in browser code. Without the secret, the Worker denies statistics reads and dashboards report that peaks are not configured; collection can still continue. The dashboard fetches both rooms only when an authenticated admin presses Load peaks. Counts are approximate open connections, not people or playback. Main and backup histories remain separate.

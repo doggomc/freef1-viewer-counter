@@ -157,3 +157,13 @@ test('health supports HEAD and cross-origin access but rejects other methods', a
   assert.equal(response.status, 405);
   assert.equal(response.headers.get('allow'), 'GET, HEAD');
 });
+
+test('peak data is closed by default and requires a secret', async () => {
+  const {env, calls} = mockEnv();
+  assert.equal((await routeRequest(request('https://counter.example/admin/peaks?site=main'), env)).status, 503);
+  env.PEAKS_READ_SECRET = 'a'.repeat(32);
+  assert.equal((await routeRequest(request('https://counter.example/admin/peaks?site=main', {headers:{Authorization:'Bearer wrong'}}), env)).status, 401);
+  assert.equal(calls.idName, null);
+  const result = await routeRequest(request('https://counter.example/admin/peaks?site=main', {headers:{Authorization:`Bearer ${env.PEAKS_READ_SECRET}`}}), env);
+  assert.equal(await result.text(), 'forwarded to room'); assert.equal(calls.idName, 'freef1-global');
+});

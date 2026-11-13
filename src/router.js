@@ -51,6 +51,24 @@ export async function routeRequest(request, env) {
     });
   }
 
+  // Read-only aggregate statistics are accessible only with a server-side secret.
+  if (url.pathname === '/admin/peaks') {
+    if (request.method !== 'GET') return textResponse('Method not allowed', 405);
+    const secret = String(env.PEAKS_READ_SECRET || '');
+    if (secret.length < 32) return textResponse('Statistics not configured', 503);
+    const supplied = request.headers.get('Authorization') || '';
+    // Constant-time comparison on fixed-length digests, without exposing the secret.
+    const enc = new TextEncoder();
+    const a = new Uint8Array(await crypto.subtle.digest('SHA-256', enc.encode(supplied)));
+    const b = new Uint8Array(await crypto.subtle.digest('SHA-256', enc.encode(`Bearer ${secret}`)));
+    let diff = 0; for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
+    if (diff) return textResponse('Unauthorized', 401);
+    const site = url.searchParams.get('site');
+    if (!['main', 'backup'].includes(site) || [...url.searchParams.keys()].some(k => k !== 'site')) return textResponse('Invalid site', 400);
+    const id = env.VIEWER_COUNTER_ROOM.idFromName(site === 'backup' ? BACKUP_ROOM : MAIN_ROOM);
+    return env.VIEWER_COUNTER_ROOM.get(id).fetch(new Request('https://counter.internal/internal/peaks'));
+  }
+
   if (url.pathname !== '/ws') {
     return textResponse('Not found', 404);
   }
