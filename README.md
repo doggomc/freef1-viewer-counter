@@ -65,6 +65,6 @@ The expected race-weekend profile is approximately 200 concurrent viewers during
 - Durable Object state and WebSocket connections: <https://developers.cloudflare.com/durable-objects/api/state/>
 - SQLite Durable Object migration example: <https://developers.cloudflare.com/durable-objects/examples/websocket-hibernation-server/>
 
-## Private peak dashboard setup
+## Peak dashboard
 
-Set the same independently generated random `PEAKS_READ_SECRET` (at least 32 characters) as an encrypted secret on this Worker and as an environment variable on headquarters and each backend. Do not commit it or put it in browser code. Without the secret, the Worker denies statistics reads and dashboards report that peaks are not configured; collection can still continue. The dashboard fetches both rooms only when an authenticated admin presses Load peaks. Counts are approximate open connections, not people or playback. Main and backup histories remain separate.
+No secret or configuration is required. Aggregate peaks are publicly readable at `/admin/peaks?site=main` and `/admin/peaks?site=backup`. The Race Control dashboard requires its usual login and fetches the two rooms only when an admin presses Load peaks. Counts are approximate open connections, not people or playback. Main and backup histories remain separate; there are no individual connection records.

@@ -158,12 +158,14 @@ test('health supports HEAD and cross-origin access but rejects other methods', a
   assert.equal(response.headers.get('allow'), 'GET, HEAD');
 });
 
-test('peak data is closed by default and requires a secret', async () => {
+test('aggregate peaks are public, read-only and separated by site', async () => {
+  for (const [site, room] of [['main','freef1-global'], ['backup','freef1-backup']]) {
+    const {env, calls} = mockEnv();
+    const response = await routeRequest(request(`https://counter.example/admin/peaks?site=${site}`), env);
+    assert.equal(await response.text(), 'forwarded to room'); assert.equal(calls.idName, room);
+  }
   const {env, calls} = mockEnv();
-  assert.equal((await routeRequest(request('https://counter.example/admin/peaks?site=main'), env)).status, 503);
-  env.PEAKS_READ_SECRET = 'a'.repeat(32);
-  assert.equal((await routeRequest(request('https://counter.example/admin/peaks?site=main', {headers:{Authorization:'Bearer wrong'}}), env)).status, 401);
+  assert.equal((await routeRequest(request('https://counter.example/admin/peaks?site=other'), env)).status, 400);
+  assert.equal((await routeRequest(request('https://counter.example/admin/peaks?site=main', {method:'POST'}), env)).status, 405);
   assert.equal(calls.idName, null);
-  const result = await routeRequest(request('https://counter.example/admin/peaks?site=main', {headers:{Authorization:`Bearer ${env.PEAKS_READ_SECRET}`}}), env);
-  assert.equal(await result.text(), 'forwarded to room'); assert.equal(calls.idName, 'freef1-global');
 });
